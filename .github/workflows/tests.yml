@@ -1,0 +1,28 @@
+name: Build component tests
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - run: dotnet restore Tests/BuildAutomation.Tests.csproj --locked-mode
+      - run: dotnet test Tests/BuildAutomation.Tests.csproj -c Release --no-restore --logger trx --results-directory TestResults
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: component-tests-${{ matrix.os }}
+          path: TestResults/*.trx
+          if-no-files-found: error
