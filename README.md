@@ -1,6 +1,6 @@
 # Shared build automation
 
-Cake Frosting build component for Neil Colvin's .NET clients, libraries, Crestron drivers and development tools. Component version: **1.0.0**. Consumers pin an immutable Git commit, not a moving branch. This project is build tooling and is not packed into product NuGet packages or driver packages.
+Cake Frosting build component for Neil Colvin's .NET clients, libraries, Crestron drivers and development tools. Component version: **1.1.0**. Consumers pin an immutable Git commit, not a moving branch. This project is build tooling and is not packed into product NuGet packages or driver packages.
 
 GitHub Actions continues to own jobs, matrices, runner selection, permissions, approvals, resource reservations, validation reuse and publication locks. The component executes repository recipes and verifies declared test results. It does not deploy to processors, sign submissions, publish packages or grant approval to reuse validation.
 
@@ -22,6 +22,8 @@ The caller installs .NET SDK 10 and uses the recipe's existing tool prerequisite
 ```
 
 ## Recipe schema 1
+
+Pages generation tasks also use the [common documentation standard](DOCUMENTATION-STANDARD.md). Their `documentation` object declares `config`, `site` and `title`, enabling shared verification after generation.
 
 Repository-owned `build/recipe.json` declares named tasks. Commands run in order, from the repository root, and stop on failure. Existing GitHub job dependencies continue to control cross-job ordering; recipes do not invent another scheduler or acquire processor reservations.
 

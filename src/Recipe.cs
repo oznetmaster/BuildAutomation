@@ -9,7 +9,7 @@ using System.Xml.Linq;
 namespace BuildAutomation;
 
 public sealed record Recipe(int Schema, Dictionary<string, BuildTask> Tasks);
-public sealed record BuildTask(Command[] Commands, string[]? Results = null);
+public sealed record BuildTask(Command[] Commands, string[]? Results = null, DocumentationSettings? Documentation = null);
 public sealed record Command(string Executable, string[]? Arguments = null,
     string? Script = null, string? Shell = null, int TimeoutMinutes = 30);
 public sealed record TestResult(string File, long Total, long Executed, long Passed, long Failed, long Skipped);
@@ -74,6 +74,7 @@ public static partial class RecipeRunner
                 commands.Add(new { executable = command.Executable, script = command.Script, completedUtc = DateTimeOffset.UtcNow });
             }
             var results = ReadFreshResults(root, task.Results, before);
+            if (task.Documentation != null) DocumentationPolicy.Verify(root, task.Documentation);
             WriteReceipt(output, new { schema = 1, task = taskName, recipeSha256 = Hash(source), startedUtc = started,
                 completedUtc = DateTimeOffset.UtcNow, succeeded = true, commands, results, publication = false });
         }
