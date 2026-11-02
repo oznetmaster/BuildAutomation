@@ -66,3 +66,5 @@ dotnet test Tests/BuildAutomation.Tests.csproj -c Release --no-restore
 ```
 
 Dependency lock files include the patched PKCS 10.0.13 build-only dependency. Cake 6.3.0's older transitive version is not used. See [Cake reuse guidance](https://cakebuild.net/docs/writing-builds/reusing-builds).
+
+The component has its own `Directory.Build.props`, `Directory.Build.targets` and NuGet source configuration. A local cache beneath a product repository therefore cannot inherit that product's build, packaging or deployment hooks.

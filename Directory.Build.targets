@@ -1,0 +1,3 @@
+<Project>
+  <!-- Keep consumer packaging/deployment targets out of the build component. -->
+</Project>
