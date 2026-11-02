@@ -333,8 +333,12 @@
       "buildautomation": {
         "type": "Project",
         "dependencies": {
-          "Cake.Frosting": "[6.3.0, )"
+          "Cake.Frosting": "[6.3.0, )",
+          "XmlDocumentation": "[1.0.0, )"
         }
+      },
+      "xmldocumentation": {
+        "type": "Project"
       }
     }
   }

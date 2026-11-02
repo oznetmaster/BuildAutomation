@@ -1,9 +1,11 @@
 // Copyright (c) 2026 Neil Colvin. MIT License; see LICENSE.
 using System.Text.Json;
+using System.Text.RegularExpressions;
+using System.Net;
 
 namespace BuildAutomation;
 
-public sealed record DocumentationSettings(string Config, string Site, string Title);
+public sealed record DocumentationSettings(string Config, string Site, string Title, string[]? GeneratedApiPrefixes = null);
 
 public static class DocumentationPolicy
 {
@@ -35,10 +37,33 @@ public static class DocumentationPolicy
             throw new InvalidDataException("Generated documentation has an empty search index.");
         foreach (var group in config.RootElement.GetProperty("metadata").EnumerateArray())
         {
+            if (!group.TryGetProperty("src", out var inputs) || inputs.GetArrayLength() == 0)
+                throw new InvalidDataException("API metadata must declare source inputs.");
+            foreach (var input in inputs.EnumerateArray())
+            {
+                if (input.TryGetProperty("cwd", out _)) throw new InvalidDataException("DocFX metadata inputs use src, not cwd.");
+                string inputRoot = Path.GetFullPath(input.TryGetProperty("src", out var src) ? src.GetString() ?? "." : ".", Path.GetDirectoryName(configPath)!);
+                foreach (var file in input.GetProperty("files").EnumerateArray())
+                {
+                    string pattern = file.GetString() ?? throw new InvalidDataException("Empty API source path.");
+                    if (pattern.Contains('*') || pattern.Contains('?')) throw new InvalidDataException("Declare explicit production project paths for API metadata.");
+                    if (!File.Exists(Path.GetFullPath(pattern, inputRoot)))
+                        throw new InvalidDataException("Missing API metadata input: " + pattern);
+                }
+            }
             string destination = group.GetProperty("dest").GetString() ?? throw new InvalidDataException("API destination is required.");
             string api = RecipeRunner.Inside(site, destination);
             if (!Directory.Exists(api) || !Directory.EnumerateFiles(api, "*.html", SearchOption.AllDirectories).Any(p => !Path.GetFileName(p).Equals("toc.html", StringComparison.OrdinalIgnoreCase)))
                 throw new InvalidDataException("No generated API pages for " + destination);
+            foreach (string page in Directory.EnumerateFiles(api, "*.html", SearchOption.AllDirectories))
+            {
+                // Generated wire-contract classes have no authored value descriptions. Keep their
+                // reference visible, with an explicit per-repository exception to this content check.
+                if ((settings.GeneratedApiPrefixes ?? []).Any(prefix => Path.GetFileName(page).StartsWith(prefix, StringComparison.Ordinal))) continue;
+                foreach (Match match in Regex.Matches(File.ReadAllText(page), @"<h4\b[^>]*>\s*Property Value\s*</h4>\s*<dl\b[^>]*>\s*<dt>.*?</dt>\s*<dd>(.*?)</dd>", RegexOptions.Singleline))
+                    if (string.IsNullOrWhiteSpace(WebUtility.HtmlDecode(Regex.Replace(match.Groups[1].Value, "<[^>]+>", ""))))
+                        throw new InvalidDataException("Generated property value description is empty: " + Path.GetRelativePath(site, page));
+            }
         }
         Console.WriteLine("Verified common Pages layout, navigation, search and every API output group.");
     }

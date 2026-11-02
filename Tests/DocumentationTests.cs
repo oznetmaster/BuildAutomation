@@ -16,11 +16,12 @@ public sealed class DocumentationTests
             string path=Path.Combine(root,"site",page);Directory.CreateDirectory(Path.GetDirectoryName(path)!);File.WriteAllText(path,"<html>rendered</html>");
         }
         File.WriteAllText(Path.Combine(root,"site","index.json"),"{\"index.html\":{\"title\":\"Example\"}}");
+        File.WriteAllText(Path.Combine(root,"Client.csproj"),"<Project />");
         Config();
     }
     [TearDown] public void Cleanup()=>Directory.Delete(root,true);
     private void Config(bool search=true,string footer=DocumentationPolicy.Footer,string[]? templates=null)=>
-        File.WriteAllText(Path.Combine(root,"docs","docfx.json"),JsonSerializer.Serialize(new {metadata=new[]{new{dest="api"}},build=new{template=templates??["default","modern"],globalMetadata=new{_appTitle="Example",_appName="Example",_appFooter=footer,_enableSearch=search}}}));
+        File.WriteAllText(Path.Combine(root,"docs","docfx.json"),JsonSerializer.Serialize(new {metadata=new[]{new{src=new[]{new{src="..",files=new[]{"Client.csproj"}}},dest="api"}},build=new{template=templates??["default","modern"],globalMetadata=new{_appTitle="Example",_appName="Example",_appFooter=footer,_enableSearch=search}}}));
     private void Verify()=>DocumentationPolicy.Verify(root,new("docs/docfx.json","site","Example"));
     [Test] public void CompleteGeneratedSitePasses()=>Assert.DoesNotThrow(Verify);
     [Test] public void DisabledSearchFails(){Config(search:false);Assert.Throws<InvalidDataException>(Verify);}
@@ -29,4 +30,13 @@ public sealed class DocumentationTests
     [Test] public void EmptySearchIndexFails(){File.WriteAllText(Path.Combine(root,"site/index.json"),"{}");Assert.Throws<InvalidDataException>(Verify);}
     [Test] public void MissingApiOutputFails(){File.Delete(Path.Combine(root,"site/api/Client.html"));Assert.Throws<InvalidDataException>(Verify);}
     [Test] public void MissingNavigationFails(){File.WriteAllText(Path.Combine(root,"docs/toc.yml"),"- name: Home\n");Assert.Throws<InvalidDataException>(Verify);}
+    [Test] public void StaleApiCannotHideMissingSource(){File.Delete(Path.Combine(root,"Client.csproj"));Assert.Throws<InvalidDataException>(Verify);}
+    [Test] public void EmptyRenderedPropertyDescriptionFails(){File.WriteAllText(Path.Combine(root,"site/api/Client.html"),"<h4>Property Value</h4><dl><dt>string</dt><dd> </dd></dl>");Assert.Throws<InvalidDataException>(Verify);}
+    [Test] public void GeneratedWireContractExceptionIsExplicit()
+    {
+        File.WriteAllText(Path.Combine(root,"site/api/Generated.Message.html"),"<h4>Property Value</h4><dl><dt>string</dt><dd> </dd></dl>");
+        Assert.Throws<InvalidDataException>(Verify);
+        Assert.DoesNotThrow(()=>DocumentationPolicy.Verify(root,new("docs/docfx.json","site","Example",["Generated."])));
+    }
+    [Test] public void RenderedPropertyDescriptionWithMarkupPasses(){File.WriteAllText(Path.Combine(root,"site/api/Client.html"),"<h4>Property Value</h4><dl><dt>string</dt><dd><p>The <code>name</code>.</p></dd></dl>");Assert.DoesNotThrow(Verify);}
 }

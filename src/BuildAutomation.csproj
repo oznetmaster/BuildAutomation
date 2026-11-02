@@ -5,10 +5,11 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
-    <Version>1.1.0</Version>
+    <Version>1.2.0</Version>
     <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
   </PropertyGroup>
   <ItemGroup>
+    <ProjectReference Include="../XmlDocumentation/XmlDocumentation.csproj" />
     <PackageReference Include="Cake.Frosting" Version="6.3.0" />
     <PackageReference Include="System.Security.Cryptography.Pkcs" Version="10.0.13" PrivateAssets="all" />
   </ItemGroup>

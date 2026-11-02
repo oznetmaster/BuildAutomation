@@ -17,3 +17,16 @@ GitHub Actions owns Pages upload/deployment, environment protection, permissions
 Source extraction differs legitimately between projects and reflection-based metadata. It stays repository-specific. A site must build successfully before publication; a blank API section is not considered a successful documentation build.
 
 References: [DocFX templates](https://dotnet.github.io/docfx/docs/template.html), [navigation and reference TOCs](https://dotnet.github.io/docfx/docs/table-of-contents.html).
+
+
+## Strict XML API documentation
+
+Library recipes declare their production projects in the top-level `xmlDocumentation.projects` list. Every shared task checks those projects before executing its commands. A dedicated CI workflow and an unconditional check in each publishing job apply the same standard even when desktop or processor results are reused.
+
+The check evaluates MSBuild Compile inputs and runs the SDK's `AddImplicitDefineConstants` target to obtain actual framework/platform symbols, alongside project-defined symbols. It audits every target framework in both Debug and Release. Public and protected authored declarations require non-empty summaries, matching parameter and type-parameter descriptions, return descriptions for non-void methods (including asynchronous methods), and `<value>` descriptions for properties and indexers. Malformed XML, wrong parameter names, duplicate tags and empty content fail. Partial types share their type documentation, while their public members remain individually checked. Overrides must be documented; explicit `<inheritdoc cref="..."/>` is accepted. Compiler XML diagnostics are errors in the production projects, including reference-resolution errors.
+
+Descriptions must explain the actual API contract, including units, null/default behavior and cancellation where relevant. A complete existing property summary can supply a value description; build tooling does not generate or invent documentation content.
+
+DocFX uses explicit existing production-project inputs and the shared policy rejects empty rendered Property Value descriptions. Generated wire-contract references can have a narrowly named `generatedApiPrefixes` exception: the generated types remain visible, and the exemption must be documented by the repository. This is distinct from authored API coverage. SDK/build-generated files that are not authored Compile inputs are outside the source-comment audit; normal compilation still checks their XML diagnostics.
+
+Ordinary IDE/product builds do not download Cake. They generate XML and enforce compiler XML diagnostics directly; `./build/Invoke.ps1 -Task xml-documentation` additionally runs the full shared content audit. A receipt records project, framework, configuration and declaration counts without claiming runtime tests were performed.

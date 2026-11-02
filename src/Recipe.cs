@@ -8,7 +8,7 @@ using System.Xml.Linq;
 
 namespace BuildAutomation;
 
-public sealed record Recipe(int Schema, Dictionary<string, BuildTask> Tasks);
+public sealed record Recipe(int Schema, Dictionary<string, BuildTask> Tasks, XmlDocumentationSettings? XmlDocumentation = null);
 public sealed record BuildTask(Command[] Commands, string[]? Results = null, DocumentationSettings? Documentation = null);
 public sealed record Command(string Executable, string[]? Arguments = null,
     string? Script = null, string? Shell = null, int TimeoutMinutes = 30);
@@ -48,6 +48,7 @@ public static partial class RecipeRunner
         var commands = new List<object>();
         try
         {
+            var xmlDocumentation = recipe.XmlDocumentation == null ? null : XmlDocumentationPolicy.Verify(root, recipe.XmlDocumentation);
             foreach (var command in task.Commands)
             {
                 int index = commands.Count;
@@ -76,7 +77,7 @@ public static partial class RecipeRunner
             var results = ReadFreshResults(root, task.Results, before);
             if (task.Documentation != null) DocumentationPolicy.Verify(root, task.Documentation);
             WriteReceipt(output, new { schema = 1, task = taskName, recipeSha256 = Hash(source), startedUtc = started,
-                completedUtc = DateTimeOffset.UtcNow, succeeded = true, commands, results, publication = false });
+                completedUtc = DateTimeOffset.UtcNow, succeeded = true, commands, results, xmlDocumentation, publication = false });
         }
         catch (Exception error)
         {

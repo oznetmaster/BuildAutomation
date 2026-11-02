@@ -239,6 +239,9 @@
         "type": "Transitive",
         "resolved": "8.0.0",
         "contentHash": "+TUFINV2q2ifyXauQXRwy4CiBhqvDEDZeVJU7qfxya4aRYOKzVBpN+4acx25VcPB9ywUN6C0n8drWl110PhZEg=="
+      },
+      "xmldocumentation": {
+        "type": "Project"
       }
     }
   }
