@@ -72,3 +72,7 @@ Dependency lock files include the patched PKCS 10.0.13 build-only dependency. Ca
 The component has its own `Directory.Build.props`, `Directory.Build.targets` and NuGet source configuration. A local cache beneath a product repository therefore cannot inherit that product's build, packaging or deployment hooks.
 
 Library recipes may also declare `xmlDocumentation.projects` for the strict API documentation gate, evaluated before every task. See [the documentation standard](DOCUMENTATION-STANDARD.md) for source, compiler and rendered-output requirements.
+
+## Public driver packages
+
+[PublicDriverPackaging](PublicDriverPackaging/README.md) defines the shared driver release guard and regression suite. Public `.pkg`, NuGet and documentation archives exclude Crestron submission PDFs; submission preparation adds the help only to a separate frozen submission copy. The scripts are distributed to driver repositories with pinned provenance so ordinary clones can run the checks locally.
