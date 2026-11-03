@@ -43,6 +43,9 @@ jobs:
           $tool = @(Get-ChildItem artifacts/packaging-tools -Recurse -Force -Filter ILRepackTool.dll)
           if ($tool.Count -ne 1) { throw 'Expected one pinned ILRepack fixture tool.' }
           ./DriverPackaging/Test-DriverPackaging.ps1 -ToolDirectory $tool[0].Directory.FullName
+          if ($IsWindows) {
+            ./DriverPackaging/Test-MergeAssemblyResolver.ps1 -ToolDirectory $tool[0].Directory.FullName -ResultsDirectory artifacts/merge-resolver
+          }
       - run: dotnet restore Tests/BuildAutomation.Tests.csproj --locked-mode
       - run: dotnet test Tests/BuildAutomation.Tests.csproj -c Release --no-restore --logger trx --results-directory TestResults
       - uses: actions/upload-artifact@v4
