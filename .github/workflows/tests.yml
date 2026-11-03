@@ -40,7 +40,7 @@ jobs:
         run: |
           dotnet tool install dotnet-ilrepack --version 2.0.45 --tool-path artifacts/packaging-tools
           if ($LASTEXITCODE -ne 0) { throw 'Pinned ILRepack fixture dependency installation failed.' }
-          $tool = @(Get-ChildItem artifacts/packaging-tools -Recurse -Filter ILRepackTool.dll)
+          $tool = @(Get-ChildItem artifacts/packaging-tools -Recurse -Force -Filter ILRepackTool.dll)
           if ($tool.Count -ne 1) { throw 'Expected one pinned ILRepack fixture tool.' }
           ./DriverPackaging/Test-DriverPackaging.ps1 -ToolDirectory $tool[0].Directory.FullName
       - run: dotnet restore Tests/BuildAutomation.Tests.csproj --locked-mode

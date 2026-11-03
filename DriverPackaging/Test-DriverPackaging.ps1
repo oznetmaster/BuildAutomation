@@ -57,7 +57,10 @@ try {
     }finally{$result.Dispose()}
     [IO.File]::WriteAllText($manifest,'{"SchemaVersion":"2.0","GeneralInformation":{"Guid":"missing-guid"}}')
     & pwsh -NoLogo -NoProfile -File "$PSScriptRoot/PatchMergedAssembly.ps1" -AssemblyPath $source -OutputPath (Join-Path $fixture 'missing-owner.dll') -CecilPath $cecil -InputListFile $inputs -ManifestPath $manifest 2>&1 | Out-Null
-    if($LASTEXITCODE -eq 0){throw 'Missing package owner was accepted.'};$checks++
+    if($LASTEXITCODE -eq 0){throw 'Missing package owner was accepted.'}
+    # The rejected child was intentional; do not propagate its exit code to GitHub's wrapper.
+    $global:LASTEXITCODE=0
+    $checks++
     Write-Host "Passed $checks native merge/patch fixture checks. No driver or device was deployed."
 }finally{
     $resolved=[IO.Path]::GetFullPath($fixture)
