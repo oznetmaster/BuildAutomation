@@ -75,4 +75,6 @@ Library recipes may also declare `xmlDocumentation.projects` for the strict API 
 
 ## Public driver packages
 
+[DriverVersioning](DriverVersioning/README.md) owns the common manifest bump, release-version resolution, package-version assertion and regression suite. Consumers keep thin local entry points and immutable copied-source provenance, including RainPoint. The extracted directory retains its original licence terms.
+
 [PublicDriverPackaging](PublicDriverPackaging/README.md) defines the shared driver release guard and regression suite. Public `.pkg`, NuGet and documentation archives exclude Crestron submission PDFs; submission preparation adds the help only to a separate frozen submission copy. The scripts are distributed to driver repositories with pinned provenance so ordinary clones can run the checks locally.
