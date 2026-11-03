@@ -30,6 +30,9 @@ jobs:
       - name: Test shared coverage evidence primitives
         shell: pwsh
         run: ./TestCoverage/Test-Coverage.ps1
+      - name: Test shared NuGet artifact preservation
+        shell: pwsh
+        run: ./NuGetArtifacts/Test-NuGetArtifacts.ps1
       - run: dotnet restore Tests/BuildAutomation.Tests.csproj --locked-mode
       - run: dotnet test Tests/BuildAutomation.Tests.csproj -c Release --no-restore --logger trx --results-directory TestResults
       - uses: actions/upload-artifact@v4
