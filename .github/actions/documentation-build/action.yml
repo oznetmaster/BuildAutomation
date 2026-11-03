@@ -35,7 +35,16 @@ runs:
       env:
         COMPONENT_ROOT: ${{ github.action_path }}/../../..
         PRODUCT_ROOT: ${{ github.workspace }}/${{ inputs.root }}
+        DOCUMENTATION_SITE: ${{ inputs.site }}
       run: |
+        if ([string]::IsNullOrWhiteSpace($env:DOCUMENTATION_SITE)) { throw 'A generated documentation site path is required.' }
+        $recipe = Get-Content -LiteralPath (Join-Path $env:PRODUCT_ROOT 'build/recipe.json') -Raw | ConvertFrom-Json
+        $declared = [string]$recipe.tasks.documentation.documentation.site
+        if ([string]::IsNullOrWhiteSpace($declared)) { throw 'The documentation recipe must declare its verified site.' }
+        $requested = [IO.Path]::GetFullPath($env:DOCUMENTATION_SITE, $env:PRODUCT_ROOT)
+        $expected = [IO.Path]::GetFullPath($declared, $env:PRODUCT_ROOT)
+        $comparison = if ($IsWindows) { [StringComparison]::OrdinalIgnoreCase } else { [StringComparison]::Ordinal }
+        if (!$requested.Equals($expected,$comparison)) { throw 'Uploaded site must match the verified recipe output.' }
         & "$env:COMPONENT_ROOT/Invoke-Build.ps1" -Root $env:PRODUCT_ROOT -Task documentation
         if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
     - uses: actions/configure-pages@v5
