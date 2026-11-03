@@ -79,6 +79,8 @@ Pinned composite actions in `.github/actions/` share documentation builds, XML v
 
 The post-release dispatcher accepts a JSON list of workflow filenames, resolves the current default-branch SHA, and avoids duplicating running or successful validation for that SHA. It validates same-repository run identity and paginates results. Its regression script uses mocked GitHub responses and performs no network operations. This helper dispatches validation only; it does not publish or bypass release checks.
 
+[TestCoverage](TestCoverage/README.md) supplies pure evidence parsing with explicit caller skip/category rules. [NuGetArtifacts](NuGetArtifacts/README.md) verifies documentation and preserves runtime bytes during local wrapper preparation. [DriverPackaging](DriverPackaging/README.md) owns the identical modern merge/Cecil-patch family; legacy families retain their current implementations until separately validated. These helpers are copied with immutable provenance for local clones and do not publish or deploy.
+
 ## Public driver packages
 
 [DriverVersioning](DriverVersioning/README.md) owns the common manifest bump, release-version resolution, package-version assertion and regression suite. Consumers keep thin local entry points and immutable copied-source provenance, including RainPoint. The extracted directory retains its original licence terms.

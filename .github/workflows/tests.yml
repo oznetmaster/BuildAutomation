@@ -17,7 +17,9 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: 10.0.x
+          dotnet-version: |
+            8.0.x
+            10.0.x
       - name: Test public driver packaging policy
         shell: pwsh
         run: ./PublicDriverPackaging/Test-PublicDriverArtifacts.ps1
@@ -33,6 +35,14 @@ jobs:
       - name: Test shared NuGet artifact preservation
         shell: pwsh
         run: ./NuGetArtifacts/Test-NuGetArtifacts.ps1
+      - name: Test shared native driver packaging
+        shell: pwsh
+        run: |
+          dotnet tool install dotnet-ilrepack --version 2.0.45 --tool-path artifacts/packaging-tools
+          if ($LASTEXITCODE -ne 0) { throw 'Pinned ILRepack fixture dependency installation failed.' }
+          $tool = @(Get-ChildItem artifacts/packaging-tools -Recurse -Filter ILRepackTool.dll)
+          if ($tool.Count -ne 1) { throw 'Expected one pinned ILRepack fixture tool.' }
+          ./DriverPackaging/Test-DriverPackaging.ps1 -ToolDirectory $tool[0].Directory.FullName
       - run: dotnet restore Tests/BuildAutomation.Tests.csproj --locked-mode
       - run: dotnet test Tests/BuildAutomation.Tests.csproj -c Release --no-restore --logger trx --results-directory TestResults
       - uses: actions/upload-artifact@v4

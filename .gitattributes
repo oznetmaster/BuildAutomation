@@ -1,3 +1,4 @@
 DriverVersioning/** text eol=lf
 TestCoverage/** text eol=lf
 NuGetArtifacts/** text eol=lf
+DriverPackaging/** text eol=lf
