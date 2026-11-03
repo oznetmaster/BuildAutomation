@@ -37,7 +37,8 @@ function Test-Archive([IO.Stream]$Stream, [string]$Label, [int]$Depth) {
     } finally { $archive.Dispose() }
 }
 
-$files = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+$pathComparison = if ($IsWindows) { [StringComparer]::OrdinalIgnoreCase } else { [StringComparer]::Ordinal }
+$files = [Collections.Generic.HashSet[string]]::new($pathComparison)
 foreach ($selected in $Path) {
     $item = Get-Item -LiteralPath $selected -ErrorAction Stop
     if ($item.PSIsContainer) {
