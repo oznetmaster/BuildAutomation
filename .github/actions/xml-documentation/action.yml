@@ -1,0 +1,20 @@
+name: Verify strict XML documentation
+description: Run the repository XML policy through the same pinned Cake component as CI.
+inputs:
+  root:
+    description: Repository directory relative to github.workspace
+    default: '.'
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: 10.0.x
+    - name: Verify every production API configuration
+      shell: pwsh
+      env:
+        COMPONENT_ROOT: ${{ github.action_path }}/../../..
+        PRODUCT_ROOT: ${{ github.workspace }}/${{ inputs.root }}
+      run: |
+        & "$env:COMPONENT_ROOT/Invoke-Build.ps1" -Root $env:PRODUCT_ROOT -Task xml-documentation
+        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

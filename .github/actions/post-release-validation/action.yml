@@ -1,0 +1,15 @@
+name: Dispatch missing post-release validation
+description: Share exact-default-source validation dispatch without publishing or changing release gates.
+inputs:
+  workflows:
+    description: JSON array of repository validation workflow filenames
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Validate the current default-branch source
+      shell: pwsh
+      env:
+        GH_TOKEN: ${{ github.token }}
+        VALIDATION_WORKFLOWS: ${{ inputs.workflows }}
+      run: '& "$env:GITHUB_ACTION_PATH/Invoke-PostReleaseValidation.ps1" -Workflows $env:VALIDATION_WORKFLOWS'

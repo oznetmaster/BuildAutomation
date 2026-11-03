@@ -73,6 +73,12 @@ The component has its own `Directory.Build.props`, `Directory.Build.targets` and
 
 Library recipes may also declare `xmlDocumentation.projects` for the strict API documentation gate, evaluated before every task. See [the documentation standard](DOCUMENTATION-STANDARD.md) for source, compiler and rendered-output requirements.
 
+## Shared workflow steps
+
+Pinned composite actions in `.github/actions/` share documentation builds, XML verification, Pages deployment and post-release validation dispatch. Callers retain checkout, workflow triggers, jobs and their names, runners/matrices, permissions, concurrency and protected environments. Documentation build actions run the existing `documentation` recipe without changing its project preparation or tests; site paths, SDK requirements and optional artifact uploads are inputs. Deployment retains either one attempt or the existing three-attempt policy. See [GitHub's composite action metadata reference](https://docs.github.com/en/actions/reference/workflows-and-actions/metadata-syntax).
+
+The post-release dispatcher accepts a JSON list of workflow filenames, resolves the current default-branch SHA, and avoids duplicating running or successful validation for that SHA. It validates same-repository run identity and paginates results. Its regression script uses mocked GitHub responses and performs no network operations. This helper dispatches validation only; it does not publish or bypass release checks.
+
 ## Public driver packages
 
 [DriverVersioning](DriverVersioning/README.md) owns the common manifest bump, release-version resolution, package-version assertion and regression suite. Consumers keep thin local entry points and immutable copied-source provenance, including RainPoint. The extracted directory retains its original licence terms.

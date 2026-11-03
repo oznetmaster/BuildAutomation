@@ -1,0 +1,46 @@
+name: Build and retain standard documentation
+description: Run the repository Cake documentation recipe and upload its existing Pages site.
+inputs:
+  root:
+    description: Repository directory relative to github.workspace
+    default: '.'
+  site:
+    description: Generated site directory relative to the repository
+    required: true
+  dotnet-version:
+    description: SDK versions required by the repository preparation recipe
+    default: '10.0.x'
+  configure-pages:
+    description: Configure Pages here when the caller previously did so after its build
+    default: 'true'
+  upload-pages:
+    description: Upload the Pages artifact; false keeps pull-request documentation build-only
+    default: 'true'
+  artifact-name:
+    description: Optional additional ordinary artifact retained by the repository
+    default: ''
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ inputs.dotnet-version }}
+    - name: Build and verify repository documentation
+      shell: pwsh
+      env:
+        COMPONENT_ROOT: ${{ github.action_path }}/../../..
+        PRODUCT_ROOT: ${{ github.workspace }}/${{ inputs.root }}
+      run: |
+        & "$env:COMPONENT_ROOT/Invoke-Build.ps1" -Root $env:PRODUCT_ROOT -Task documentation
+        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+    - uses: actions/configure-pages@v5
+      if: inputs.configure-pages == 'true'
+    - uses: actions/upload-artifact@v4
+      if: inputs.artifact-name != ''
+      with:
+        name: ${{ inputs.artifact-name }}
+        path: ${{ inputs.root }}/${{ inputs.site }}
+    - uses: actions/upload-pages-artifact@v3
+      if: inputs.upload-pages == 'true'
+      with:
+        path: ${{ inputs.root }}/${{ inputs.site }}
