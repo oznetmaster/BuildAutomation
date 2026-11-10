@@ -18,6 +18,21 @@ $null = New-Item -ItemType Directory -Force -Path $receiptDirectory
 $receipt = [ordered]@{ Version = $Version; SourceCommit = $commit; ManifestSha256 = (Get-FileHash -LiteralPath (Join-Path $directory 'release-manifest.json') -Algorithm SHA256).Hash.ToLowerInvariant(); Packages = @(); Completed = $false }
 $receiptPath = Join-Path $receiptDirectory 'publication-receipt.json'
 $receipt | ConvertTo-Json -Depth 7 | Set-Content -LiteralPath $receiptPath -Encoding utf8NoBOM
+$tag = "v$Version"
+$releases = @(Get-ReleaseGitHubJson "repos/$env:GITHUB_REPOSITORY/releases?per_page=100")
+$matches = @($releases | Where-Object { $_.tag_name -ceq $tag })
+if ($matches.Count -gt 1) { throw 'Ambiguous GitHub release identity.' }
+$title = "$($plan.name) $Version"
+$notes = Get-Content -LiteralPath (Join-Path $directory 'RELEASE-NOTES.md') -Raw
+if (!$matches.Count) {
+    # Confirm GitHub draft access before any irreversible NuGet push. Recovery at
+    # an older workflow revision may require an operator-created matching draft.
+    Invoke-ReleaseNative gh @('release','create',$tag,'--repo',$env:GITHUB_REPOSITORY,'--target',$commit,'--draft','--title',$title,'--notes-file',(Join-Path $directory 'RELEASE-NOTES.md'))
+}
+$release = Get-ReleaseRecord $Version
+if ($release.name -cne $title -or $release.body.TrimEnd() -cne $notes.TrimEnd()) { throw 'Existing GitHub release metadata differs; it will not be edited.' }
+if ($release.draft -and $release.target_commitish -cne $commit) { throw 'Draft release targets different source.' }
+Assert-ReleaseRemoteTag $Version $commit -AllowMissing:$release.draft
 foreach ($package in $manifest.Packages) {
     $path = Join-Path $directory $package.File
     if (Get-NuGetVersionPresent $package.Id $Version) {
@@ -37,19 +52,6 @@ foreach ($package in $manifest.Packages) {
     $receipt.Packages += @{ Id = $package.Id; Version = $Version; Action = $action; PayloadSha256 = $package.PayloadSha256 }
     $receipt | ConvertTo-Json -Depth 7 | Set-Content -LiteralPath $receiptPath -Encoding utf8NoBOM
 }
-$tag = "v$Version"
-$releases = @(Get-ReleaseGitHubJson "repos/$env:GITHUB_REPOSITORY/releases?per_page=100")
-$matches = @($releases | Where-Object { $_.tag_name -ceq $tag })
-if ($matches.Count -gt 1) { throw 'Ambiguous GitHub release identity.' }
-$title = "$($plan.name) $Version"
-$notes = Get-Content -LiteralPath (Join-Path $directory 'RELEASE-NOTES.md') -Raw
-if (!$matches.Count) {
-    Invoke-ReleaseNative gh @('release','create',$tag,'--repo',$env:GITHUB_REPOSITORY,'--target',$commit,'--draft','--title',$title,'--notes-file',(Join-Path $directory 'RELEASE-NOTES.md'))
-}
-$release = Get-ReleaseRecord $Version
-if ($release.name -cne $title -or $release.body.TrimEnd() -cne $notes.TrimEnd()) { throw 'Existing GitHub release metadata differs; it will not be edited.' }
-if ($release.draft -and $release.target_commitish -cne $commit) { throw 'Draft release targets different source.' }
-Assert-ReleaseRemoteTag $Version $commit -AllowMissing:$release.draft
 $files = @(Get-ReleaseAssetFiles $directory)
 $expected = @($files.Name)
 if (@($release.assets | Where-Object { $_.name -cnotin $expected }).Count) { throw 'Unexpected existing GitHub release assets; none will be removed.' }

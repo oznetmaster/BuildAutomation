@@ -1,6 +1,6 @@
 # Shared build automation
 
-Cake Frosting build component for Neil Colvin's .NET clients, libraries, Crestron drivers and development tools. Component version: **1.3.1**. Consumers pin an immutable Git commit, not a moving branch. This project is build tooling and is not packed into product NuGet packages or driver packages.
+Cake Frosting build component for Neil Colvin's .NET clients, libraries, Crestron drivers and development tools. Component version: **1.3.2**. Consumers pin an immutable Git commit, not a moving branch. This project is build tooling and is not packed into product NuGet packages or driver packages.
 
 GitHub Actions continues to own jobs, matrices, runner selection, permissions, approvals, resource reservations, validation reuse and publication locks. The Cake executor runs repository recipes and verifies declared test results. It does not deploy to processors, sign submissions, publish packages or grant approval to reuse validation. Separate shared publication actions run only in the caller's explicitly configured publication job.
 

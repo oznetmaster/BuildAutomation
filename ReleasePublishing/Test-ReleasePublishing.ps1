@@ -95,7 +95,7 @@ try {
         }
         if ($Arguments[0] -cne 'release') { throw 'Unexpected GitHub command.' }
         switch ($Arguments[1]) {
-            'create' { $state.Release = @{ id=50;target_commitish=$state.Commit;name = 'Example 1.0.1'; tag_name = 'v1.0.1'; body = Get-Content -LiteralPath (Join-Path $state.Root 'artifacts/release/RELEASE-NOTES.md') -Raw; draft = $true; prerelease = $false; html_url = 'https://github.com/example/library/releases/tag/v1.0.1'; assets = @() } }
+            'create' { if ($state.ContainsKey('FailCreate') -and $state.FailCreate) { $state.FailCreate=$false; $global:LASTEXITCODE=1; return }; $state.Release = @{ id=50;target_commitish=$state.Commit;name = 'Example 1.0.1'; tag_name = 'v1.0.1'; body = Get-Content -LiteralPath (Join-Path $state.Root 'artifacts/release/RELEASE-NOTES.md') -Raw; draft = $true; prerelease = $false; html_url = 'https://github.com/example/library/releases/tag/v1.0.1'; assets = @() } }
             'upload' {
                 if ($state.FailUpload) { $state.FailUpload = $false; $global:LASTEXITCODE = 1; return }
                 $file = Get-Item -LiteralPath $Arguments[3]
@@ -137,6 +137,9 @@ try {
     $env:RELEASE_SOURCE_COMMIT=$commit;$env:RELEASE_SOURCE_RUN_ID='123';$env:GITHUB_SHA='b'*40
     Check ((Get-ReleaseHead $fixture) -ceq $commit) 'Explicit frozen source recovery rejected.'
     $env:RELEASE_SOURCE_RUN_ID='';Reject { Get-ReleaseHead $fixture };$env:RELEASE_SOURCE_RUN_ID='123'
+    $global:ReleaseFixture.FailCreate=$true
+    Reject { & "$PSScriptRoot/Publish-Release.ps1" -Root $fixture -Version '1.0.1' }
+    Check ($global:ReleaseFixture.Pushes -eq 0 -and !$global:ReleaseFixture.Release) 'GitHub draft access failure occurred after an irreversible NuGet push.'
     Reject { & "$PSScriptRoot/Publish-Release.ps1" -Root $fixture -Version '1.0.1' }
     Check ($global:ReleaseFixture.Pushes -eq 1 -and $global:ReleaseFixture.Release.draft) 'Publication interruption did not retain the frozen draft.'
     & "$PSScriptRoot/Publish-Release.ps1" -Root $fixture -Version '1.0.1'; $checks++
