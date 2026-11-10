@@ -5,6 +5,7 @@ $ErrorActionPreference = 'Stop'
 Import-Module "$PSScriptRoot/ReleasePublishing.psm1" -Force
 $plan = Read-ReleaseConfiguration $Root $Config $Version
 $commit = Get-ReleaseHead $Root
+Assert-ReleaseSourceUnchanged $Root $plan
 Assert-ReleaseTag $Root $Version $commit
 if (!$env:GITHUB_REPOSITORY) { throw 'Publication preflight requires a GitHub repository identity.' }
 $releases = @(Get-ReleaseGitHubJson "repos/$env:GITHUB_REPOSITORY/releases?per_page=100")

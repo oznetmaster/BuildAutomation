@@ -6,6 +6,7 @@ $ErrorActionPreference = 'Stop'
 Import-Module "$PSScriptRoot/ReleasePublishing.psm1" -Force
 $plan = Read-ReleaseConfiguration $Root $Config $Version
 $commit = Get-ReleaseHead $Root
+Assert-ReleaseSourceUnchanged $Root $plan
 $directory = Resolve-ReleasePath $Root 'artifacts/release'
 $manifest = Test-ReleaseManifest $directory $plan $Version $commit
 Assert-ReleaseTag $Root $Version $commit

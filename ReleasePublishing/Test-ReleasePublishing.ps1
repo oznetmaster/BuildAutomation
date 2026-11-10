@@ -70,7 +70,7 @@ try {
     'wrong' | Set-Content (Join-Path $directory 'SHA256SUMS.txt'); Reject { Test-ReleaseManifest $directory $plan '1.0.1' $commit }; [IO.File]::WriteAllBytes((Join-Path $directory 'SHA256SUMS.txt'), $checksums)
     $env:GITHUB_SHA = $commit; $env:GITHUB_REPOSITORY = 'example/library'; $env:GH_TOKEN = 'fake-gh'; $env:RELEASE_NUGET_KEY = 'fake-short-lived-key'
     $global:ReleaseFixture = @{ Commit = $commit; Package = $package; Signed = $signed; Existing = $false; Pushes = 0; Uploads = 0; Release = $null; FailUpload = $true; Mismatch = $false; Root = $fixture }
-    function global:git { param([Parameter(ValueFromRemainingArguments)][string[]]$Arguments); $global:LASTEXITCODE = 0; if ($Arguments -contains 'rev-parse') { return $global:ReleaseFixture.Commit }; if ($Arguments -contains '--list') { return }; throw 'Unexpected git request.' }
+    function global:git { param([Parameter(ValueFromRemainingArguments)][string[]]$Arguments); $global:LASTEXITCODE = 0; if ($Arguments -contains 'rev-parse') { return $global:ReleaseFixture.Commit }; if ($Arguments -contains '--name-only') { if ($global:ReleaseFixture.ContainsKey('DirtySource')) { return $global:ReleaseFixture.DirtySource }; return }; if ($Arguments -contains '--list' -or $Arguments -contains 'ls-files') { return }; throw 'Unexpected git request.' }
     function global:Invoke-RestMethod { param([string]$Uri); if ($Uri -notmatch '^https://api.nuget.org/v3-flatcontainer/example/index.json$') { throw 'Unexpected HTTP request.' }; return @{ versions = $(if ($global:ReleaseFixture.Existing) { @('1.0.1') } else { @() }) } }
     function global:Invoke-WebRequest { param([string]$Uri,[string]$OutFile); if ($Uri -notmatch '^https://api.nuget.org/v3-flatcontainer/example/1.0.1/example.1.0.1.nupkg$') { throw 'Unexpected package download.' }; Copy-Item -LiteralPath $(if ($global:ReleaseFixture.Mismatch) { Join-Path $global:ReleaseFixture.Root 'different.nupkg' } else { $global:ReleaseFixture.Signed }) -Destination $OutFile }
     function global:dotnet { param([Parameter(ValueFromRemainingArguments)][string[]]$Arguments); if ($Arguments[0] -cne 'nuget' -or $Arguments[1] -cne 'push') { throw 'Unexpected native dotnet operation.' }; $global:ReleaseFixture.Pushes++; $global:ReleaseFixture.Existing = $true; $global:LASTEXITCODE = 0 }
@@ -96,6 +96,10 @@ try {
             default { throw 'Unexpected GitHub release mutation.' }
         }
     }
+    Assert-ReleaseSourceUnchanged $fixture $plan; $checks++
+    $global:ReleaseFixture.DirtySource = 'Runtime.cs'
+    Reject { Assert-ReleaseSourceUnchanged $fixture $plan }
+    $global:ReleaseFixture.Remove('DirtySource')
     Reject { & "$PSScriptRoot/Publish-Release.ps1" -Root $fixture -Version '1.0.1' }
     Check ($global:ReleaseFixture.Pushes -eq 1 -and $global:ReleaseFixture.Release.draft) 'Publication interruption did not retain the frozen draft.'
     & "$PSScriptRoot/Publish-Release.ps1" -Root $fixture -Version '1.0.1'; $checks++

@@ -70,6 +70,21 @@ function Get-ReleaseHead {
     return $sha
 }
 
+function Assert-ReleaseSourceUnchanged {
+    param([string]$Root, [hashtable]$Plan)
+    # Some older projects write their generated API XML beside the csproj. Only
+    # those exact documentation output names may change during package staging.
+    $generated = @($Plan.packages | ForEach-Object {
+        $assembly = if ($_.ContainsKey('assembly')) { $_.assembly } else { $_.id }
+        (([IO.Path]::GetDirectoryName($_.project) + '/' + $assembly + '.xml') -replace '\\','/')
+    })
+    $changed = @(& git -C $Root diff HEAD --name-only)
+    if ($LASTEXITCODE -ne 0) { throw 'Cannot inspect release source changes.' }
+    $untracked = @(& git -C $Root ls-files --others --exclude-standard)
+    if ($LASTEXITCODE -ne 0) { throw 'Cannot inspect untracked release inputs.' }
+    if ($untracked.Count -or @($changed | Where-Object { $_ -cnotin $generated }).Count) { throw 'Release source differs from its recorded commit.' }
+}
+
 function Get-NuGetVersionPresent {
     param([string]$Id, [string]$Version)
     try { $index = Invoke-RestMethod ("https://api.nuget.org/v3-flatcontainer/$($Id.ToLowerInvariant())/index.json") }

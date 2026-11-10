@@ -5,6 +5,7 @@ $ErrorActionPreference = 'Stop'
 Import-Module "$PSScriptRoot/ReleasePublishing.psm1" -Force
 $plan = Read-ReleaseConfiguration $Root $Config $Version
 $directory = Resolve-ReleasePath $Root 'artifacts/release'
+Assert-ReleaseSourceUnchanged $Root $plan
 $null = Write-ReleaseManifest $directory $plan $Version (Get-ReleaseHead $Root)
 $null = Test-ReleaseManifest $directory $plan $Version (Get-ReleaseHead $Root)
 Write-Output "Frozen and verified $($plan.name) $Version release assets."
