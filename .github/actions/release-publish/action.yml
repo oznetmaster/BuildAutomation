@@ -31,7 +31,7 @@ runs:
       with:
         name: public-release-${{ inputs.version }}
         path: artifacts/release
-        run-id: ${{ inputs.source-run-id }}
+        run-id: ${{ inputs.source-run-id || github.run_id }}
         github-token: ${{ github.token }}
     - name: Verify frozen bytes before requesting publishing credentials
       shell: pwsh

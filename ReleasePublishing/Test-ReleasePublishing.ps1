@@ -21,6 +21,10 @@ function New-Package([string]$Path, [string]$Payload = 'product payload', [strin
 $variables = @('GITHUB_SHA','GITHUB_REPOSITORY','GITHUB_REF','GITHUB_WORKFLOW_REF','RELEASE_SOURCE_COMMIT','RELEASE_SOURCE_RUN_ID','GH_TOKEN','RELEASE_NUGET_KEY')
 $saved = @{}; foreach ($variable in $variables) { $saved[$variable] = [Environment]::GetEnvironmentVariable($variable) }
 try {
+    # The download action receives an explicit run-id. Blank values do not use
+    # its metadata default reliably, and can request a nonexistent artifact run.
+    $action = Get-Content -LiteralPath "$PSScriptRoot/../.github/actions/release-publish/action.yml" -Raw
+    Check ($action.Contains('run-id: ${{ inputs.source-run-id || github.run_id }}')) 'Normal publication must select the current artifact run while preserving exact recovery selection.'
     foreach ($version in @('1.0.1','0.0.1','20.123.456')) { Assert-ReleaseVersion $version; $checks++ }
     foreach ($version in @('', 'v1.0.1','01.0.1','1.0.1.0','1.0','1.0.1-beta',"1.0.1`ninvalid",'1.0.1+metadata')) { Reject { Assert-ReleaseVersion $version } }
     foreach ($path in @('../outside','nested/../../outside',[IO.Path]::GetFullPath($fixture))) { Reject { Resolve-ReleasePath $fixture $path } }
