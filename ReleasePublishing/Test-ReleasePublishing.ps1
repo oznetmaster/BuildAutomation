@@ -47,6 +47,8 @@ try {
     $package = Join-Path $directory 'Example.1.0.1.nupkg'
     New-Package $package
     Test-ReleasePackage $package $plan.packages[0] '1.0.1'; $checks++
+    $requiredSymbols = @{ packages = @(@{ id = 'Example'; symbols = $true }) }
+    Reject { Test-ReleaseSymbols $directory $requiredSymbols '1.0.1' }
     Reject { Test-ReleasePackage $package $plan.packages[0] '1.0.2' }
     foreach ($variant in @('MissingXml','Duplicate','Unsafe')) {
         $path = Join-Path $fixture ($variant + '.nupkg'); $options = @{ $variant = $true }; New-Package $path @options

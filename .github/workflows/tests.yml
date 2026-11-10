@@ -38,6 +38,9 @@ jobs:
       - name: Test shared public release preparation and recovery
         shell: pwsh
         run: ./ReleasePublishing/Test-ReleasePublishing.ps1
+      - name: Test portable symbol build matching
+        shell: pwsh
+        run: ./LibrarySymbols/Test-LibrarySymbols.ps1
       - name: Test shared native driver packaging
         shell: pwsh
         run: |

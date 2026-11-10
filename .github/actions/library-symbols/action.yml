@@ -1,0 +1,22 @@
+name: Verify matching library symbols
+description: Require portable symbols from the exact library builds; optionally publish using the caller credential.
+inputs:
+  directory:
+    required: true
+    description: Directory containing the library nupkg and matching snupkg files
+  publish:
+    default: 'false'
+    description: Publish verified symbol packages after main package publication
+  nuget-key:
+    default: ''
+    description: Caller-issued short-lived credential, required only for publication
+runs:
+  using: composite
+  steps:
+    - shell: pwsh
+      env:
+        SYMBOL_COMPONENT: ${{ github.action_path }}/../../../LibrarySymbols
+        SYMBOL_DIRECTORY: ${{ inputs.directory }}
+        SYMBOL_PUBLISH: ${{ inputs.publish }}
+        RELEASE_NUGET_KEY: ${{ inputs.nuget-key }}
+      run: '& "$env:SYMBOL_COMPONENT/Verify-LibrarySymbols.ps1" -Directory $env:SYMBOL_DIRECTORY -Publish:($env:SYMBOL_PUBLISH -eq ''true'')'

@@ -28,6 +28,7 @@ try {
             } finally { $zip.Dispose() }
         }
     }
+    Test-ReleaseSymbols $output $plan $Version
     foreach ($application in $plan.applications) {
         $null = Resolve-ReleasePath $Root $application.project
         if ($application.name -cnotmatch '^[A-Za-z0-9_.-]+$') { throw 'Invalid application artifact name.' }

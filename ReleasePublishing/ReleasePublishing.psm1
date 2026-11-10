@@ -1,6 +1,7 @@
 # Copyright (c) 2026 Neil Colvin. MIT License; see LICENSE.
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+Import-Module "$PSScriptRoot/../LibrarySymbols/LibrarySymbols.psm1" -Force
 
 function Resolve-ReleasePath {
     param([string]$Root, [string]$Path)
@@ -33,6 +34,7 @@ function Read-ReleaseConfiguration {
         if ($package.id -cnotmatch '^[A-Za-z0-9_.-]+$' -or !$ids.Add($package.id) -or !$package.project -or !$package.ContainsKey('frameworks')) { throw 'Invalid or duplicate release package.' }
         $null = Resolve-ReleasePath $Root $package.project
         foreach ($framework in $package.frameworks) { if ($framework -cnotmatch '^net[0-9.]+(?:-windows)?$') { throw 'Invalid package framework.' } }
+        if ($package.ContainsKey('symbols') -and ($package.symbols -isnot [bool] -or ($package.symbols -and !$package.frameworks.Count))) { throw 'Symbol policy must be boolean and requires a binary package.' }
     }
     $notes = Resolve-ReleasePath $Root ($plan.notesFile.Replace('{version}', $Version))
     if (!(Test-Path -LiteralPath $notes -PathType Leaf) -or [string]::IsNullOrWhiteSpace((Get-Content -LiteralPath $notes -Raw))) { throw 'Versioned release notes are required.' }
@@ -213,6 +215,16 @@ function Get-NuGetPayloadHash {
     } finally { $zip.Dispose() }
 }
 
+function Test-ReleaseSymbols {
+    param([string]$Directory, [hashtable]$Plan, [string]$Version)
+    foreach ($package in $Plan.packages) {
+        $path = Join-Path $Directory "$($package.id).$Version.snupkg"
+        if (($package.ContainsKey('symbols') -and $package.symbols) -or (Test-Path -LiteralPath $path)) {
+            $null = Test-LibrarySymbolPair (Join-Path $Directory "$($package.id).$Version.nupkg") $path
+        }
+    }
+}
+
 function Get-ReleaseAssetFiles {
     param([string]$Directory)
     if (!(Test-Path -LiteralPath $Directory -PathType Container)) { throw 'Release assets are missing.' }
@@ -230,6 +242,7 @@ function Write-ReleaseManifest {
     if (@($files | Where-Object Name -in 'release-manifest.json','SHA256SUMS.txt').Count) { throw 'Release staging is not fresh.' }
     $packageFiles = @($files | Where-Object Extension -eq '.nupkg')
     if ($packageFiles.Count -ne $Plan.packages.Count) { throw 'Unexpected release package count.' }
+    Test-ReleaseSymbols $Directory $Plan $Version
     $packages = @(foreach ($package in $Plan.packages) {
         $path = Join-Path $Directory "$($package.id).$Version.nupkg"
         Test-ReleasePackage $path $package $Version
@@ -271,6 +284,7 @@ function Test-ReleaseManifest {
         $entry = @($manifest.Packages | Where-Object Id -CEQ $package.id)
         if ($entry.Count -ne 1 -or (Get-NuGetPayloadHash $path) -cne $entry[0].PayloadSha256) { throw 'Frozen NuGet content changed.' }
     }
+    Test-ReleaseSymbols $Directory $Plan $Version
     return $manifest
 }
 

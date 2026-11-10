@@ -24,7 +24,7 @@ The three composite actions live at `.github/actions/release-prepare`, `release-
   "versionXPath": "/Project/PropertyGroup/Version",
   "notesFile": "release-notes/v{version}.md",
   "packages": [
-    { "id": "ExampleClient", "project": "src/ExampleClient/ExampleClient.csproj", "frameworks": ["net472", "net10.0"] }
+    { "id": "ExampleClient", "project": "src/ExampleClient/ExampleClient.csproj", "frameworks": ["net472", "net10.0"], "symbols": true }
   ],
   "applications": [],
   "documents": ["README.md", "CHANGELOG.md", "LICENSE"],
@@ -34,6 +34,8 @@ The three composite actions live at `.github/actions/release-prepare`, `release-
 ```
 
 The notes start with `# ExampleClient 1.2.3` and a non-empty explanation. A metapackage declares an empty framework list. Applications declare a repository-relative `project`, an artifact `name`, and an optional `framework`. Application output is framework dependent; the component does not install or bundle a runtime. `rawLibraries` extracts the DLL/XML bytes from the actual nupkg rather than selecting potentially stale build outputs. `libraryArchive` creates a library ZIP from those same packages. Optional `documentationArchive` names an already-validated HTML site; repository documentation recipes remain authoritative.
+
+Every maintained binary library package declares `"symbols": true` and imports the [portable symbol policy](../LibrarySymbols/README.md). Its separate `.snupkg` is frozen and uploaded to GitHub with the other assets, then published to NuGet's symbol server. Validation checks each framework's DLL against the portable PDB's actual build identity before staging, freezing and publication. Dependency-only metapackages contain no compiled code and have no symbol package. Older frozen configurations without this requirement remain recoverable; existing published releases are unchanged.
 
 Common staging is local-only and refuses non-empty output directories. It never uses device pairings, creates tags, obtains credentials or publishes. It can be called directly for diagnostics, but normal local and CI usage is the same Cake `release-assets` task. Existing specialized package checks remain prerequisites/postchecks in the repository recipe.
 
