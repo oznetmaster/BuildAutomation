@@ -1,0 +1,20 @@
+name: Prepare public release
+description: Validate version, linked notes, source/tag identity and unpublished package versions without mutation.
+inputs:
+  version:
+    required: true
+    description: Canonical three-part package version
+  config:
+    default: build/release.json
+    description: Repository-owned release configuration
+runs:
+  using: composite
+  steps:
+    - shell: pwsh
+      env:
+        RELEASE_COMPONENT: ${{ github.action_path }}/../../../ReleasePublishing
+        RELEASE_ROOT: ${{ github.workspace }}
+        RELEASE_VERSION: ${{ inputs.version }}
+        RELEASE_CONFIG: ${{ inputs.config }}
+        GH_TOKEN: ${{ github.token }}
+      run: '& "$env:RELEASE_COMPONENT/Prepare-Release.ps1" -Root $env:RELEASE_ROOT -Version $env:RELEASE_VERSION -Config $env:RELEASE_CONFIG'

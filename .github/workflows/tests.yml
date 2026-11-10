@@ -35,6 +35,9 @@ jobs:
       - name: Test shared NuGet artifact preservation
         shell: pwsh
         run: ./NuGetArtifacts/Test-NuGetArtifacts.ps1
+      - name: Test shared public release preparation and recovery
+        shell: pwsh
+        run: ./ReleasePublishing/Test-ReleasePublishing.ps1
       - name: Test shared native driver packaging
         shell: pwsh
         run: |

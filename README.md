@@ -1,8 +1,8 @@
 # Shared build automation
 
-Cake Frosting build component for Neil Colvin's .NET clients, libraries, Crestron drivers and development tools. Component version: **1.1.0**. Consumers pin an immutable Git commit, not a moving branch. This project is build tooling and is not packed into product NuGet packages or driver packages.
+Cake Frosting build component for Neil Colvin's .NET clients, libraries, Crestron drivers and development tools. Component version: **1.3.0**. Consumers pin an immutable Git commit, not a moving branch. This project is build tooling and is not packed into product NuGet packages or driver packages.
 
-GitHub Actions continues to own jobs, matrices, runner selection, permissions, approvals, resource reservations, validation reuse and publication locks. The component executes repository recipes and verifies declared test results. It does not deploy to processors, sign submissions, publish packages or grant approval to reuse validation.
+GitHub Actions continues to own jobs, matrices, runner selection, permissions, approvals, resource reservations, validation reuse and publication locks. The Cake executor runs repository recipes and verifies declared test results. It does not deploy to processors, sign submissions, publish packages or grant approval to reuse validation. Separate shared publication actions run only in the caller's explicitly configured publication job.
 
 ## Calling a repository recipe
 
@@ -86,3 +86,7 @@ The post-release dispatcher accepts a JSON list of workflow filenames, resolves 
 [DriverVersioning](DriverVersioning/README.md) owns the common manifest bump, release-version resolution, package-version assertion and regression suite. Consumers keep thin local entry points and immutable copied-source provenance, including RainPoint. The extracted directory retains its original licence terms.
 
 [PublicDriverPackaging](PublicDriverPackaging/README.md) defines the shared driver release guard and regression suite. Public `.pkg`, NuGet and documentation archives exclude Crestron submission PDFs; submission preparation adds the help only to a separate frozen submission copy. The scripts are distributed to driver repositories with pinned provenance so ordinary clones can run the checks locally.
+
+## Public library releases
+
+[ReleasePublishing](ReleasePublishing/README.md) shares version/tag/notes validation, local artifact staging, frozen NuGet payload verification and checksums, artifact retention, OIDC-based NuGet publication and verified GitHub draft publication. Cake runs the common staging script through each repository's release recipe. Publication itself remains in a separate GitHub job with the caller's original workflow identity and protected environment. Failed publication jobs reuse the retained artifacts rather than rebuilding or moving tags. Consumer recipes keep their specialized checks, apps and documentation prerequisites.

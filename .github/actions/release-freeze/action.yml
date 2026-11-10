@@ -1,0 +1,21 @@
+name: Freeze public release assets
+description: Verify configured packages, freeze hashes and retain the exact assets for retryable publication.
+inputs:
+  version:
+    required: true
+    description: Canonical three-part package version
+runs:
+  using: composite
+  steps:
+    - shell: pwsh
+      env:
+        RELEASE_COMPONENT: ${{ github.action_path }}/../../../ReleasePublishing
+        RELEASE_ROOT: ${{ github.workspace }}
+        RELEASE_VERSION: ${{ inputs.version }}
+      run: '& "$env:RELEASE_COMPONENT/Freeze-Release.ps1" -Root $env:RELEASE_ROOT -Version $env:RELEASE_VERSION'
+    - uses: actions/upload-artifact@v4
+      with:
+        name: public-release-${{ inputs.version }}
+        path: artifacts/release/*
+        if-no-files-found: error
+        retention-days: 30

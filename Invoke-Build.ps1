@@ -9,9 +9,11 @@ $ErrorActionPreference = 'Stop'
 $repositoryRoot = (Resolve-Path -LiteralPath $Root).Path
 # Resolve the build tool SDK from its own global.json, never from the product's.
 Push-Location -LiteralPath $PSScriptRoot
+$previousComponentRoot = $env:BUILD_AUTOMATION_COMPONENT_ROOT
+$env:BUILD_AUTOMATION_COMPONENT_ROOT = $PSScriptRoot
 try {
     dotnet restore src/BuildAutomation.csproj --locked-mode --verbosity quiet
     if ($LASTEXITCODE -ne 0) { throw 'Shared build-tool restore failed.' }
     dotnet run --project src/BuildAutomation.csproj -c Release --no-restore -- --target=Run "--root=$repositoryRoot" "--recipe=$Recipe" "--task=$Task"
     if ($LASTEXITCODE -ne 0) { throw "Cake task failed: $Task" }
-} finally { Pop-Location }
+} finally { $env:BUILD_AUTOMATION_COMPONENT_ROOT = $previousComponentRoot; Pop-Location }

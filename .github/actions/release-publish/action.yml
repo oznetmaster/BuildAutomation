@@ -1,0 +1,46 @@
+name: Publish frozen public release
+description: Preserve caller OIDC identity, verify downloaded assets and publish matching NuGet and GitHub bytes.
+inputs:
+  version:
+    required: true
+    description: Canonical three-part package version
+  nuget-user:
+    default: oznetmaster
+    description: NuGet profile name
+runs:
+  using: composite
+  steps:
+    - uses: actions/download-artifact@v4
+      with:
+        name: public-release-${{ inputs.version }}
+        path: artifacts/release
+    - name: Verify frozen bytes before requesting publishing credentials
+      shell: pwsh
+      env:
+        RELEASE_COMPONENT: ${{ github.action_path }}/../../../ReleasePublishing
+        RELEASE_ROOT: ${{ github.workspace }}
+        RELEASE_VERSION: ${{ inputs.version }}
+      run: |
+        Import-Module "$env:RELEASE_COMPONENT/ReleasePublishing.psm1" -Force
+        $plan = Read-ReleaseConfiguration $env:RELEASE_ROOT 'build/release.json' $env:RELEASE_VERSION
+        $null = Test-ReleaseManifest (Join-Path $env:RELEASE_ROOT 'artifacts/release') $plan $env:RELEASE_VERSION (Get-ReleaseHead $env:RELEASE_ROOT)
+    - name: Authenticate using the caller's NuGet trust policy
+      id: login
+      uses: NuGet/login@8d196754b4036150537f80ac539e15c2f1028841
+      with:
+        user: ${{ inputs.nuget-user }}
+    - name: Publish exact frozen assets and verify readback
+      shell: pwsh
+      env:
+        RELEASE_COMPONENT: ${{ github.action_path }}/../../../ReleasePublishing
+        RELEASE_ROOT: ${{ github.workspace }}
+        RELEASE_VERSION: ${{ inputs.version }}
+        RELEASE_NUGET_KEY: ${{ steps.login.outputs.NUGET_API_KEY }}
+        GH_TOKEN: ${{ github.token }}
+      run: '& "$env:RELEASE_COMPONENT/Publish-Release.ps1" -Root $env:RELEASE_ROOT -Version $env:RELEASE_VERSION'
+    - uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: publication-receipt-${{ inputs.version }}
+        path: artifacts/publication/*.json
+        if-no-files-found: warn
