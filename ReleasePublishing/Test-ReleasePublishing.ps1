@@ -18,7 +18,7 @@ function New-Package([string]$Path, [string]$Payload = 'product payload', [strin
         if ($Duplicate) { $writer = [IO.StreamWriter]::new($zip.CreateEntry('LIB/net472/Example.dll').Open()); try { $writer.Write('duplicate') } finally { $writer.Dispose() } }
     } finally { $zip.Dispose() }
 }
-$variables = @('GITHUB_SHA','GITHUB_REPOSITORY','GITHUB_WORKFLOW_REF','RELEASE_SOURCE_COMMIT','RELEASE_SOURCE_RUN_ID','GH_TOKEN','RELEASE_NUGET_KEY')
+$variables = @('GITHUB_SHA','GITHUB_REPOSITORY','GITHUB_REF','GITHUB_WORKFLOW_REF','RELEASE_SOURCE_COMMIT','RELEASE_SOURCE_RUN_ID','GH_TOKEN','RELEASE_NUGET_KEY')
 $saved = @{}; foreach ($variable in $variables) { $saved[$variable] = [Environment]::GetEnvironmentVariable($variable) }
 try {
     foreach ($version in @('1.0.1','0.0.1','20.123.456')) { Assert-ReleaseVersion $version; $checks++ }
@@ -79,6 +79,9 @@ try {
         $state = $global:ReleaseFixture; $global:LASTEXITCODE = 0
         if ($Arguments[0] -ceq 'api') {
             $route = $Arguments[1]
+            if ($route -ceq 'repos/example/library') { return '{"default_branch":"main"}' }
+            if ($route -ceq 'repos/example/library/environments/release') { return '{"deployment_branch_policy":{"custom_branch_policies":true,"protected_branches":false}}' }
+            if ($route -ceq 'repos/example/library/environments/release/deployment-branch-policies') { return (@{branch_policies=$state.EnvironmentRules}|ConvertTo-Json -Depth 5 -Compress) }
             if ($route -ceq 'repos/example/library/releases?per_page=100') { if ($state.Release) { return (ConvertTo-Json -InputObject @($state.Release) -Depth 8 -Compress) }; return '[]' }
             if ($route -ceq 'repos/example/library/releases/50') { return ($state.Release | ConvertTo-Json -Depth 8 -Compress) }
             if ($route -ceq 'repos/example/library/releases/tags/v1.0.1') { throw 'Draft releases must be resolved by ID, never by an uncreated tag.' }
@@ -106,6 +109,15 @@ try {
     $global:ReleaseFixture.DirtySource = 'Runtime.cs'
     Reject { Assert-ReleaseSourceUnchanged $fixture $plan }
     $global:ReleaseFixture.Remove('DirtySource')
+    $env:GITHUB_REF='refs/heads/main';Assert-ReleaseExecutionRef '1.0.1';$checks++
+    $env:GITHUB_REF='refs/tags/v1.0.1';Assert-ReleaseExecutionRef '1.0.1';$checks++
+    foreach($executionRef in @('refs/heads/feature','refs/tags/v1.0.2','refs/tags/v-publication-test')){$env:GITHUB_REF=$executionRef;Reject { Assert-ReleaseExecutionRef '1.0.1' }}
+    $env:GITHUB_REF='refs/heads/main'
+    $global:ReleaseFixture.EnvironmentRules=@(@{type='branch';name='main'},@{type='tag';name='v*'})
+    $policy=Test-ReleaseRepositoryPolicy 'example/library';Check ($policy.State -ceq 'Verified' -and $policy.ReadOnly) 'Shared repository policy was not verified.'
+    $global:ReleaseFixture.EnvironmentRules=@(@{type='tag';name='v*'});Reject { Test-ReleaseRepositoryPolicy 'example/library' }
+    $global:ReleaseFixture.EnvironmentRules=@(@{type='branch';name='main'},@{type='branch';name='feature'},@{type='tag';name='v*'});Reject { Test-ReleaseRepositoryPolicy 'example/library' }
+    $global:ReleaseFixture.EnvironmentRules=@(@{type='branch';name='main'},@{type='tag';name='v*'})
     $env:GITHUB_WORKFLOW_REF = 'example/library/.github/workflows/publish.yml@refs/heads/main'
     $global:ReleaseFixture.OriginalRun = @{repository=@{full_name='example/library'};head_sha=$commit;status='completed';event='workflow_dispatch';path='.github/workflows/publish.yml'}
     $global:ReleaseFixture.BuildConclusion = 'success'

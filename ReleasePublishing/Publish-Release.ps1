@@ -6,6 +6,7 @@ $ErrorActionPreference = 'Stop'
 Import-Module "$PSScriptRoot/ReleasePublishing.psm1" -Force
 if ($env:RELEASE_SOURCE_COMMIT) { Assert-ReleaseArtifactRun $env:RELEASE_SOURCE_RUN_ID $env:RELEASE_SOURCE_COMMIT }
 $plan = Read-ReleaseConfiguration $Root $Config $Version
+Assert-ReleaseExecutionRef $Version
 $commit = Get-ReleaseHead $Root
 Assert-ReleaseSourceUnchanged $Root $plan
 $directory = Resolve-ReleasePath $Root 'artifacts/release'

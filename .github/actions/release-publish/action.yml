@@ -41,9 +41,11 @@ runs:
         RELEASE_VERSION: ${{ inputs.version }}
         RELEASE_SOURCE_COMMIT: ${{ inputs.source-commit }}
         RELEASE_SOURCE_RUN_ID: ${{ inputs.source-run-id }}
+        GH_TOKEN: ${{ github.token }}
       run: |
         Import-Module "$env:RELEASE_COMPONENT/ReleasePublishing.psm1" -Force
         $plan = Read-ReleaseConfiguration $env:RELEASE_ROOT 'build/release.json' $env:RELEASE_VERSION
+        Assert-ReleaseExecutionRef $env:RELEASE_VERSION
         $null = Test-ReleaseManifest (Join-Path $env:RELEASE_ROOT 'artifacts/release') $plan $env:RELEASE_VERSION (Get-ReleaseHead $env:RELEASE_ROOT)
     - name: Authenticate using the caller's NuGet trust policy
       id: login

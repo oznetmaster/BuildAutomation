@@ -85,6 +85,26 @@ function Assert-ReleaseArtifactRun {
     if (!@($jobs.jobs | Where-Object { $_.name -ceq 'build' -and $_.conclusion -ceq 'success' }).Count) { throw 'The original release build was not successful.' }
 }
 
+function Assert-ReleaseExecutionRef {
+    param([string]$Version)
+    Assert-ReleaseVersion $Version
+    if (!$env:GITHUB_REPOSITORY -or !$env:GITHUB_REF) { throw 'Publication requires the caller repository and execution reference.' }
+    $repository = Get-ReleaseGitHubJson "repos/$env:GITHUB_REPOSITORY"
+    if ($env:GITHUB_REF -cne ('refs/heads/'+$repository.default_branch) -and $env:GITHUB_REF -cne "refs/tags/v$Version") { throw 'Publication must run from the default branch or the matching numeric release tag.' }
+}
+
+function Test-ReleaseRepositoryPolicy {
+    param([string]$Repository)
+    if ($Repository -cnotmatch '^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$') { throw 'Invalid repository identity.' }
+    $metadata = Get-ReleaseGitHubJson "repos/$Repository"
+    $environment = Get-ReleaseGitHubJson "repos/$Repository/environments/release"
+    $policies = Get-ReleaseGitHubJson "repos/$Repository/environments/release/deployment-branch-policies"
+    if (!$environment.deployment_branch_policy.custom_branch_policies -or $environment.deployment_branch_policy.protected_branches) { throw 'Release environment must use selected deployment branches/tags.' }
+    $rules = @($policies.branch_policies)
+    if ($rules.Count -ne 2 -or @($rules | Where-Object { $_.type -ceq 'branch' -and $_.name -ceq $metadata.default_branch }).Count -ne 1 -or @($rules | Where-Object { $_.type -ceq 'tag' -and $_.name -ceq 'v*' }).Count -ne 1) { throw 'Release environment differs from the shared default-branch/v* policy.' }
+    return @{ Repository = $Repository; Environment = 'release'; DefaultBranch = $metadata.default_branch; Branches = @($metadata.default_branch); Tags = @('v*'); State = 'Verified'; ReadOnly = $true }
+}
+
 function Get-ReleaseRecord {
     param([string]$Version)
     $items = @(Get-ReleaseGitHubJson "repos/$env:GITHUB_REPOSITORY/releases?per_page=100")

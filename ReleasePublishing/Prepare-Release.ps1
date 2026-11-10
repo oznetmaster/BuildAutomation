@@ -4,6 +4,7 @@ param([Parameter(Mandatory)][string]$Root, [Parameter(Mandatory)][string]$Versio
 $ErrorActionPreference = 'Stop'
 Import-Module "$PSScriptRoot/ReleasePublishing.psm1" -Force
 $plan = Read-ReleaseConfiguration $Root $Config $Version
+Assert-ReleaseExecutionRef $Version
 $commit = Get-ReleaseHead $Root
 Assert-ReleaseSourceUnchanged $Root $plan
 Assert-ReleaseTag $Root $Version $commit
