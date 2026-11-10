@@ -94,15 +94,24 @@ function Assert-ReleaseExecutionRef {
 }
 
 function Test-ReleaseRepositoryPolicy {
-    param([string]$Repository)
+    param([string]$Repository, [string]$Environment = '')
     if ($Repository -cnotmatch '^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$') { throw 'Invalid repository identity.' }
     $metadata = Get-ReleaseGitHubJson "repos/$Repository"
-    $environment = Get-ReleaseGitHubJson "repos/$Repository/environments/release"
-    $policies = Get-ReleaseGitHubJson "repos/$Repository/environments/release/deployment-branch-policies"
-    if (!$environment.deployment_branch_policy.custom_branch_policies -or $environment.deployment_branch_policy.protected_branches) { throw 'Release environment must use selected deployment branches/tags.' }
-    $rules = @($policies.branch_policies)
-    if ($rules.Count -ne 2 -or @($rules | Where-Object { $_.type -ceq 'branch' -and $_.name -ceq $metadata.default_branch }).Count -ne 1 -or @($rules | Where-Object { $_.type -ceq 'tag' -and $_.name -ceq 'v*' }).Count -ne 1) { throw 'Release environment differs from the shared default-branch/v* policy.' }
-    return @{ Repository = $Repository; Environment = 'release'; DefaultBranch = $metadata.default_branch; Branches = @($metadata.default_branch); Tags = @('v*'); State = 'Verified'; ReadOnly = $true }
+    $result = @{ Repository = $Repository; Environment = $Environment; DefaultBranch = $metadata.default_branch; State = 'NoEnvironment'; Rules = @(); ReadOnly = $true }
+    if (!$Environment) { return $result }
+    $encoded = [Uri]::EscapeDataString($Environment)
+    $configuration = Get-ReleaseGitHubJson "repos/$Repository/environments/$encoded"
+    $result.State = 'Unrestricted'
+    if ($configuration.deployment_branch_policy) {
+        if ($configuration.deployment_branch_policy.custom_branch_policies) {
+            $policies = Get-ReleaseGitHubJson "repos/$Repository/environments/$encoded/deployment-branch-policies"
+            $result.State = 'SelectedRefs'
+            $result.Rules = @($policies.branch_policies)
+        } elseif ($configuration.deployment_branch_policy.protected_branches) { $result.State = 'ProtectedBranches' }
+    }
+    # Inspection only: no environment or additional restrictions are required.
+    # Existing OIDC environment bindings remain owned by the caller.
+    return $result
 }
 
 function Get-ReleaseRecord {
