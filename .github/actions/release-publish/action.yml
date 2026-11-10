@@ -7,19 +7,40 @@ inputs:
   nuget-user:
     default: oznetmaster
     description: NuGet profile name
+  source-run-id:
+    default: ''
+    description: Optional original completed build run for frozen-artifact recovery
+  source-commit:
+    default: ''
+    description: Exact original source commit, required with source-run-id
 runs:
   using: composite
   steps:
+    - name: Verify the original build before frozen-artifact recovery
+      if: inputs.source-run-id != ''
+      shell: pwsh
+      env:
+        RELEASE_COMPONENT: ${{ github.action_path }}/../../../ReleasePublishing
+        RELEASE_SOURCE_COMMIT: ${{ inputs.source-commit }}
+        RELEASE_SOURCE_RUN_ID: ${{ inputs.source-run-id }}
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        Import-Module "$env:RELEASE_COMPONENT/ReleasePublishing.psm1" -Force
+        Assert-ReleaseArtifactRun $env:RELEASE_SOURCE_RUN_ID $env:RELEASE_SOURCE_COMMIT
     - uses: actions/download-artifact@v4
       with:
         name: public-release-${{ inputs.version }}
         path: artifacts/release
+        run-id: ${{ inputs.source-run-id }}
+        github-token: ${{ github.token }}
     - name: Verify frozen bytes before requesting publishing credentials
       shell: pwsh
       env:
         RELEASE_COMPONENT: ${{ github.action_path }}/../../../ReleasePublishing
         RELEASE_ROOT: ${{ github.workspace }}
         RELEASE_VERSION: ${{ inputs.version }}
+        RELEASE_SOURCE_COMMIT: ${{ inputs.source-commit }}
+        RELEASE_SOURCE_RUN_ID: ${{ inputs.source-run-id }}
       run: |
         Import-Module "$env:RELEASE_COMPONENT/ReleasePublishing.psm1" -Force
         $plan = Read-ReleaseConfiguration $env:RELEASE_ROOT 'build/release.json' $env:RELEASE_VERSION
@@ -36,11 +57,13 @@ runs:
         RELEASE_ROOT: ${{ github.workspace }}
         RELEASE_VERSION: ${{ inputs.version }}
         RELEASE_NUGET_KEY: ${{ steps.login.outputs.NUGET_API_KEY }}
+        RELEASE_SOURCE_COMMIT: ${{ inputs.source-commit }}
+        RELEASE_SOURCE_RUN_ID: ${{ inputs.source-run-id }}
         GH_TOKEN: ${{ github.token }}
       run: '& "$env:RELEASE_COMPONENT/Publish-Release.ps1" -Root $env:RELEASE_ROOT -Version $env:RELEASE_VERSION'
     - uses: actions/upload-artifact@v4
       if: always()
       with:
-        name: publication-receipt-${{ inputs.version }}
+        name: publication-receipt-${{ inputs.version }}-${{ github.run_attempt }}
         path: artifacts/publication/*.json
         if-no-files-found: warn

@@ -4,6 +4,7 @@
 param([Parameter(Mandatory)][string]$Root, [Parameter(Mandatory)][string]$Version, [string]$Config = 'build/release.json')
 $ErrorActionPreference = 'Stop'
 Import-Module "$PSScriptRoot/ReleasePublishing.psm1" -Force
+if ($env:RELEASE_SOURCE_COMMIT) { Assert-ReleaseArtifactRun $env:RELEASE_SOURCE_RUN_ID $env:RELEASE_SOURCE_COMMIT }
 $plan = Read-ReleaseConfiguration $Root $Config $Version
 $commit = Get-ReleaseHead $Root
 Assert-ReleaseSourceUnchanged $Root $plan
@@ -44,15 +45,10 @@ $notes = Get-Content -LiteralPath (Join-Path $directory 'RELEASE-NOTES.md') -Raw
 if (!$matches.Count) {
     Invoke-ReleaseNative gh @('release','create',$tag,'--repo',$env:GITHUB_REPOSITORY,'--target',$commit,'--draft','--title',$title,'--notes-file',(Join-Path $directory 'RELEASE-NOTES.md'))
 }
-$release = Get-ReleaseGitHubJson "repos/$env:GITHUB_REPOSITORY/releases/tags/$tag"
+$release = Get-ReleaseRecord $Version
 if ($release.name -cne $title -or $release.body.TrimEnd() -cne $notes.TrimEnd()) { throw 'Existing GitHub release metadata differs; it will not be edited.' }
-$ref = Get-ReleaseGitHubJson "repos/$env:GITHUB_REPOSITORY/git/ref/tags/$tag"
-$target = $ref.object
-for ($depth = 0; $target.type -ceq 'tag'; $depth++) {
-    if ($depth -ge 4) { throw 'Unexpected tag indirection.' }
-    $target = (Get-ReleaseGitHubJson "repos/$env:GITHUB_REPOSITORY/git/tags/$($target.sha)").object
-}
-if ($target.type -cne 'commit' -or $target.sha -cne $commit) { throw 'Release tag does not identify the frozen source.' }
+if ($release.draft -and $release.target_commitish -cne $commit) { throw 'Draft release targets different source.' }
+Assert-ReleaseRemoteTag $Version $commit -AllowMissing:$release.draft
 $files = @(Get-ReleaseAssetFiles $directory)
 $expected = @($files.Name)
 if (@($release.assets | Where-Object { $_.name -cnotin $expected }).Count) { throw 'Unexpected existing GitHub release assets; none will be removed.' }
@@ -64,7 +60,7 @@ foreach ($file in $files | Sort-Object { if ($_.Name -eq 'release-manifest.json'
         Invoke-ReleaseNative gh @('release','upload',$tag,$file.FullName,'--repo',$env:GITHUB_REPOSITORY)
     }
 }
-$release = Get-ReleaseGitHubJson "repos/$env:GITHUB_REPOSITORY/releases/tags/$tag"
+$release = Get-ReleaseRecord $Version
 if (@($release.assets).Count -ne $files.Count) { throw 'GitHub release asset count differs from the frozen set.' }
 foreach ($file in $files) {
     $asset = @($release.assets | Where-Object { $_.name -ceq $file.Name })
@@ -80,8 +76,9 @@ foreach ($file in $files) {
     }
 }
 if ($release.draft) { Invoke-ReleaseNative gh @('release','edit',$tag,'--repo',$env:GITHUB_REPOSITORY,'--draft=false','--latest') }
-$release = Get-ReleaseGitHubJson "repos/$env:GITHUB_REPOSITORY/releases/tags/$tag"
+$release = Get-ReleaseRecord $Version
 if ($release.draft -or $release.prerelease) { throw 'Stable GitHub publication was not confirmed.' }
+Assert-ReleaseRemoteTag $Version $commit
 $receipt.GitHubRelease = $release.html_url
 $receipt.Completed = $true
 $receipt.CompletedUtc = [DateTimeOffset]::UtcNow

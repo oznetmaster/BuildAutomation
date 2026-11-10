@@ -66,8 +66,49 @@ function Get-ReleaseHead {
     param([string]$Root)
     $sha = & git -C $Root rev-parse HEAD
     if ($LASTEXITCODE -ne 0 -or $sha -cnotmatch '^[a-f0-9]{40}$') { throw 'Cannot identify the release source.' }
-    if ($env:GITHUB_SHA -and $sha -cne $env:GITHUB_SHA) { throw 'Checked-out source differs from the workflow commit.' }
+    $expected = $env:GITHUB_SHA
+    if ($env:RELEASE_SOURCE_COMMIT) {
+        if ($env:RELEASE_SOURCE_COMMIT -cnotmatch '^[a-f0-9]{40}$' -or $env:RELEASE_SOURCE_RUN_ID -cnotmatch '^[1-9][0-9]*$') { throw 'Recovery requires an exact source commit and original workflow run.' }
+        $expected = $env:RELEASE_SOURCE_COMMIT
+    }
+    if ($expected -and $sha -cne $expected) { throw 'Checked-out source differs from the validated release source.' }
     return $sha
+}
+
+function Assert-ReleaseArtifactRun {
+    param([string]$RunId, [string]$Commit)
+    if ($RunId -cnotmatch '^[1-9][0-9]*$' -or $Commit -cnotmatch '^[a-f0-9]{40}$' -or !$env:GITHUB_REPOSITORY -or !$env:GITHUB_WORKFLOW_REF) { throw 'Invalid frozen-artifact recovery context.' }
+    $run = Get-ReleaseGitHubJson "repos/$env:GITHUB_REPOSITORY/actions/runs/$RunId"
+    $workflow = ($env:GITHUB_WORKFLOW_REF -split '/.github/workflows/',2)[1] -split '@',2
+    if ($run.repository.full_name -cne $env:GITHUB_REPOSITORY -or $run.head_sha -cne $Commit -or $run.status -cne 'completed' -or $run.event -cnotin @('push','workflow_dispatch') -or $run.path -cne ('.github/workflows/'+$workflow[0])) { throw 'Recovery run does not identify this repository/workflow and completed release source.' }
+    $jobs = Get-ReleaseGitHubJson "repos/$env:GITHUB_REPOSITORY/actions/runs/$RunId/jobs?filter=all&per_page=100"
+    if (!@($jobs.jobs | Where-Object { $_.name -ceq 'build' -and $_.conclusion -ceq 'success' }).Count) { throw 'The original release build was not successful.' }
+}
+
+function Get-ReleaseRecord {
+    param([string]$Version)
+    $items = @(Get-ReleaseGitHubJson "repos/$env:GITHUB_REPOSITORY/releases?per_page=100")
+    $matches = @($items | Where-Object { $_.tag_name -ceq "v$Version" })
+    if ($matches.Count -ne 1) { throw 'Cannot uniquely identify the GitHub release or draft.' }
+    return (Get-ReleaseGitHubJson "repos/$env:GITHUB_REPOSITORY/releases/$($matches[0].id)")
+}
+
+function Assert-ReleaseRemoteTag {
+    param([string]$Version, [string]$Commit, [switch]$AllowMissing)
+    # Draft releases are discoverable by release ID, but need not have a tag yet.
+    $response = & gh api "repos/$env:GITHUB_REPOSITORY/git/ref/tags/v$Version" 2>$null
+    $code = $LASTEXITCODE
+    $ref = $response | ConvertFrom-Json -AsHashtable
+    if ($code -ne 0) {
+        if ($AllowMissing -and $ref.status -eq '404') { return }
+        throw 'Cannot verify the release tag.'
+    }
+    $target = $ref.object
+    for ($depth = 0; $target.type -ceq 'tag'; $depth++) {
+        if ($depth -ge 4) { throw 'Unexpected tag indirection.' }
+        $target = (Get-ReleaseGitHubJson "repos/$env:GITHUB_REPOSITORY/git/tags/$($target.sha)").object
+    }
+    if ($target.type -cne 'commit' -or $target.sha -cne $Commit) { throw 'Release tag does not identify the frozen source.' }
 }
 
 function Assert-ReleaseSourceUnchanged {

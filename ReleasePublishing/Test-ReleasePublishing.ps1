@@ -18,7 +18,7 @@ function New-Package([string]$Path, [string]$Payload = 'product payload', [strin
         if ($Duplicate) { $writer = [IO.StreamWriter]::new($zip.CreateEntry('LIB/net472/Example.dll').Open()); try { $writer.Write('duplicate') } finally { $writer.Dispose() } }
     } finally { $zip.Dispose() }
 }
-$variables = @('GITHUB_SHA','GITHUB_REPOSITORY','GH_TOKEN','RELEASE_NUGET_KEY')
+$variables = @('GITHUB_SHA','GITHUB_REPOSITORY','GITHUB_WORKFLOW_REF','RELEASE_SOURCE_COMMIT','RELEASE_SOURCE_RUN_ID','GH_TOKEN','RELEASE_NUGET_KEY')
 $saved = @{}; foreach ($variable in $variables) { $saved[$variable] = [Environment]::GetEnvironmentVariable($variable) }
 try {
     foreach ($version in @('1.0.1','0.0.1','20.123.456')) { Assert-ReleaseVersion $version; $checks++ }
@@ -80,13 +80,19 @@ try {
         if ($Arguments[0] -ceq 'api') {
             $route = $Arguments[1]
             if ($route -ceq 'repos/example/library/releases?per_page=100') { if ($state.Release) { return (ConvertTo-Json -InputObject @($state.Release) -Depth 8 -Compress) }; return '[]' }
-            if ($route -ceq 'repos/example/library/releases/tags/v1.0.1') { return ($state.Release | ConvertTo-Json -Depth 8 -Compress) }
-            if ($route -ceq 'repos/example/library/git/ref/tags/v1.0.1') { return (@{ object = @{ type = 'commit'; sha = $state.Commit } } | ConvertTo-Json -Depth 5 -Compress) }
+            if ($route -ceq 'repos/example/library/releases/50') { return ($state.Release | ConvertTo-Json -Depth 8 -Compress) }
+            if ($route -ceq 'repos/example/library/releases/tags/v1.0.1') { throw 'Draft releases must be resolved by ID, never by an uncreated tag.' }
+            if ($route -ceq 'repos/example/library/git/ref/tags/v1.0.1') {
+                if ($state.Release.draft) { $global:LASTEXITCODE = 1; return '{"message":"Not Found","status":"404"}' }
+                return (@{ object = @{ type = 'commit'; sha = $state.Commit } } | ConvertTo-Json -Depth 5 -Compress)
+            }
+            if ($route -ceq 'repos/example/library/actions/runs/123') { return ($state.OriginalRun | ConvertTo-Json -Depth 6 -Compress) }
+            if ($route -ceq 'repos/example/library/actions/runs/123/jobs?filter=all&per_page=100') { return (@{jobs=@(@{name='build';conclusion=$state.BuildConclusion})}|ConvertTo-Json -Depth 6 -Compress) }
             throw 'Unexpected GitHub API route.'
         }
         if ($Arguments[0] -cne 'release') { throw 'Unexpected GitHub command.' }
         switch ($Arguments[1]) {
-            'create' { $state.Release = @{ name = 'Example 1.0.1'; tag_name = 'v1.0.1'; body = Get-Content -LiteralPath (Join-Path $state.Root 'artifacts/release/RELEASE-NOTES.md') -Raw; draft = $true; prerelease = $false; html_url = 'https://github.com/example/library/releases/tag/v1.0.1'; assets = @() } }
+            'create' { $state.Release = @{ id=50;target_commitish=$state.Commit;name = 'Example 1.0.1'; tag_name = 'v1.0.1'; body = Get-Content -LiteralPath (Join-Path $state.Root 'artifacts/release/RELEASE-NOTES.md') -Raw; draft = $true; prerelease = $false; html_url = 'https://github.com/example/library/releases/tag/v1.0.1'; assets = @() } }
             'upload' {
                 if ($state.FailUpload) { $state.FailUpload = $false; $global:LASTEXITCODE = 1; return }
                 $file = Get-Item -LiteralPath $Arguments[3]
@@ -100,6 +106,20 @@ try {
     $global:ReleaseFixture.DirtySource = 'Runtime.cs'
     Reject { Assert-ReleaseSourceUnchanged $fixture $plan }
     $global:ReleaseFixture.Remove('DirtySource')
+    $env:GITHUB_WORKFLOW_REF = 'example/library/.github/workflows/publish.yml@refs/heads/main'
+    $global:ReleaseFixture.OriginalRun = @{repository=@{full_name='example/library'};head_sha=$commit;status='completed';event='workflow_dispatch';path='.github/workflows/publish.yml'}
+    $global:ReleaseFixture.BuildConclusion = 'success'
+    Assert-ReleaseArtifactRun '123' $commit; $checks++
+    foreach($case in @(@{Key='head_sha';Bad=('b'*40)},@{Key='path';Bad='.github/workflows/other.yml'},@{Key='status';Bad='in_progress'},@{Key='event';Bad='pull_request'})) {
+        $previous=$global:ReleaseFixture.OriginalRun[$case.Key];$global:ReleaseFixture.OriginalRun[$case.Key]=$case.Bad
+        Reject { Assert-ReleaseArtifactRun '123' $commit }
+        $global:ReleaseFixture.OriginalRun[$case.Key]=$previous
+    }
+    $global:ReleaseFixture.OriginalRun.repository.full_name='other/library';Reject { Assert-ReleaseArtifactRun '123' $commit };$global:ReleaseFixture.OriginalRun.repository.full_name='example/library'
+    $global:ReleaseFixture.BuildConclusion='failure';Reject { Assert-ReleaseArtifactRun '123' $commit };$global:ReleaseFixture.BuildConclusion='success'
+    $env:RELEASE_SOURCE_COMMIT=$commit;$env:RELEASE_SOURCE_RUN_ID='123';$env:GITHUB_SHA='b'*40
+    Check ((Get-ReleaseHead $fixture) -ceq $commit) 'Explicit frozen source recovery rejected.'
+    $env:RELEASE_SOURCE_RUN_ID='';Reject { Get-ReleaseHead $fixture };$env:RELEASE_SOURCE_RUN_ID='123'
     Reject { & "$PSScriptRoot/Publish-Release.ps1" -Root $fixture -Version '1.0.1' }
     Check ($global:ReleaseFixture.Pushes -eq 1 -and $global:ReleaseFixture.Release.draft) 'Publication interruption did not retain the frozen draft.'
     & "$PSScriptRoot/Publish-Release.ps1" -Root $fixture -Version '1.0.1'; $checks++
